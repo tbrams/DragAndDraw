@@ -1,115 +1,163 @@
 package dk.brams.draganddraw;
 
-import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PointF;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
 
 public class BoxDrawingView extends View {
-    private static final String TAG = "BoxDrawingView";
-    private Box mCurrentBox;
-    private ArrayList<Box> mBoxes = new ArrayList<Box>();
-    private Paint mBoxPaint;
-    private Paint mBackgroundPaint;
+        public static final String TAG = "BoxDrawingView";
 
-    // Used when creating the view in code
-    public BoxDrawingView(Context context) {
-        this(context, null);
-    }
+        private Box mCurrentBox;
+        private ArrayList<Box> mBoxes = new ArrayList<Box>();
+        private Paint mBoxPaint;
+        private Paint mBackgroundPaint;
 
-    // Used when creating the view from XML
-    public BoxDrawingView(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        setId(R.id.view_id);
+        private PointF centerPoint;
+        private float left;
+        private float right;
+        private float top;
+        private float bottom;
+        private double origAngle1;
+        private double origAngle2;
+        private PointF curr1 = new PointF();
+        private PointF orig1 = new PointF();
 
-        // Use a semitransparent red for boxes
-        mBoxPaint = new Paint();
-        mBoxPaint.setColor(0x22ff0000);
-
-        // And off-white for the background
-        mBackgroundPaint = new Paint();
-        mBackgroundPaint.setColor(0xfff8efe0);
-
-
-    }
-
-    public boolean onTouchEvent(MotionEvent event) {
-        PointF curr = new PointF(event.getX(), event.getY());
-        Log.i(TAG, "Received event at ("+curr.x + ","+curr.y+")");
-
-        switch (event.getAction()) {
-            case MotionEvent.ACTION_DOWN:
-                Log.i(TAG, " ACTION DOWN");
-                // Reset drawing state
-                mCurrentBox = new Box(curr);
-                mBoxes.add(mCurrentBox);
-                break;
-
-            case MotionEvent.ACTION_MOVE:
-                Log.i(TAG," ACTION_MOVE");
-                if (mCurrentBox!=null) {
-                    mCurrentBox.setCurrent(curr);
-                    invalidate();
-                }
-                break;
-
-            case MotionEvent.ACTION_UP:
-                Log.i(TAG," ACTION_UP");
-                mCurrentBox=null;
-                break;
-
-            case MotionEvent.ACTION_CANCEL:
-                Log.i(TAG," ACTION_CANCEL");
-                mCurrentBox=null;
-                break;
+        public BoxDrawingView(android.content.Context context)
+        {
+            super(context, null);
         }
 
-        return true;
-    }
+        public BoxDrawingView(android.content.Context context, android.util.AttributeSet attrs)
+        {
+            super(context, attrs);
+            setId(R.id.view_id);
 
-    @Override
-    protected void onDraw(Canvas canvas) {
-        canvas.drawPaint(mBackgroundPaint);
+            mBoxPaint = new Paint();
+            mBoxPaint.setColor(0x22ff0000);
+            mBoxPaint.setStyle(Paint.Style.FILL);
 
-        for (Box box: mBoxes) {
-            float left = Math.min(box.getOrigin().x, box.getCurrent().x);
-            float right = Math.max(box.getOrigin().x, box.getCurrent().x);
-            float top = Math.min(box.getOrigin().y, box.getCurrent().y);
-            float bottom = Math.max(box.getOrigin().y, box.getCurrent().y);
-
-            canvas.drawRect(left, top, right, bottom, mBoxPaint);
-        }
-    }
-
-    @Override
-    protected Parcelable onSaveInstanceState() {
-        Bundle bundle = new Bundle();
-
-        if (mBoxes.size()!=0) {
-            bundle.putParcelable("instanceState", super.onSaveInstanceState());
-            bundle.putSerializable("arrayListToSave", this.mBoxes);
+            mBackgroundPaint = new Paint();
+            mBackgroundPaint.setColor(0xfff8efe0);
         }
 
-        return bundle;
+        @Override
+        public boolean onTouchEvent(MotionEvent event)
+        {
+            curr1.set(event.getX(), event.getY());
+            int pointerCount = event.getPointerCount();
 
-    }
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    orig1.set(curr1.x, curr1.y);
+                    mCurrentBox = new Box();
+                    mBoxes.add(mCurrentBox);
+                    break;
 
-    @Override
-    protected void onRestoreInstanceState(Parcelable state) {
-        Bundle bundle = null;
-        if (state instanceof Bundle) {
-            bundle = (Bundle) state;
-            this.mBoxes = (ArrayList<Box>)bundle.getSerializable("arrayListToSave");
-            state=bundle.getParcelable("instanceState");
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    if (mCurrentBox != null && pointerCount == 2) {
+                        centerPoint = getCenterPoint(left, top, right, bottom);
+                        origAngle1 = getAngle(centerPoint, event.getX(), event.getY());
+                        origAngle2 = getAngle(centerPoint, event.getX(1), event.getY(1));
+                    }
+                    break;
+
+                case MotionEvent.ACTION_MOVE:
+                    if (mCurrentBox != null)
+                    {
+                        if (pointerCount > 1) {
+                            double currentAngle1 = getAngle(centerPoint, event.getX(0), event.getY(0)) - origAngle1;
+                            double currentAngle2 = getAngle(centerPoint, event.getX(1), event.getY(1)) - origAngle2;
+                            double currentAngle = currentAngle1 + currentAngle2;
+                            mCurrentBox.setLeftTop(rotate(left, top, centerPoint.x, centerPoint.y, currentAngle));
+                            mCurrentBox.setRightTop(rotate(right, top, centerPoint.x, centerPoint.y, currentAngle));
+                            mCurrentBox.setRightBottom(rotate(right, bottom, centerPoint.x, centerPoint.y, currentAngle));
+                            mCurrentBox.setLeftBottom(rotate(left, bottom, centerPoint.x, centerPoint.y, currentAngle));
+                        } else {
+                            left = Math.min(orig1.x, curr1.x);
+                            right = Math.max(orig1.x, curr1.x);
+                            top = Math.min(orig1.y, curr1.y);
+                            bottom = Math.max(orig1.y, curr1.y);
+
+                            mCurrentBox.setLeftTop(new PointF(left, top));
+                            mCurrentBox.setRightTop(new PointF(right, top));
+                            mCurrentBox.setRightBottom(new PointF(right, bottom));
+                            mCurrentBox.setLeftBottom(new PointF(left, bottom));
+                        }
+                        invalidate();
+                    }
+                    break;
+
+                case MotionEvent.ACTION_POINTER_UP:
+                case MotionEvent.ACTION_UP:
+                    mCurrentBox = null;
+                    break;
+
+                case MotionEvent.ACTION_CANCEL:
+                    mCurrentBox = null;
+                    break;
+            }
+            return true;
         }
-        super.onRestoreInstanceState(state);
-    }
+
+        @Override
+        protected void onDraw(Canvas canvas)
+        {
+            canvas.drawPaint(mBackgroundPaint);
+            for (Box box:mBoxes){
+                Path path = new Path();
+                path.moveTo(box.getLeftTop().x, box.getLeftTop().y);
+                path.lineTo(box.getRightTop().x, box.getRightTop().y);
+                path.lineTo(box.getRightBottom().x, box.getRightBottom().y);
+                path.lineTo(box.getLeftBottom().x, box.getLeftBottom().y);
+                path.close();
+                canvas.drawPath(path, mBoxPaint);
+            }
+        }
+
+        @Override
+        protected Parcelable onSaveInstanceState()
+        {
+            Parcelable savedState = super.onSaveInstanceState();
+            Bundle bundle = new Bundle();
+            bundle.putParcelable("savedState", savedState);
+            bundle.putSerializable("BUNDLE_BOXES", mBoxes);
+            return bundle;
+        }
+
+        @Override
+        protected void onRestoreInstanceState(Parcelable state)
+        {
+            Parcelable savedState = ((Bundle) state).getParcelable("savedState");
+            super.onRestoreInstanceState(savedState);
+
+            mBoxes = (ArrayList<Box>) ((Bundle) state).getSerializable("BUNDLE_BOXES");
+            invalidate();
+        }
+
+        PointF getCenterPoint(float left, float top, float right, float bottom){
+            return new PointF((left + right) / 2, (top + bottom) / 2);
+        }
+
+        double getAngle (PointF centerPoint, float x, float y){
+            return Math.atan2(x - centerPoint.x, centerPoint.y - y);
+        }
+
+        PointF rotate(double x, double y, double cx, double cy, double angle){
+            double tX;
+            x = x - cx;
+            y = y - cy;
+            tX = x;
+            x = tX * Math.cos(angle) - y * Math.sin(angle);
+            y = tX * Math.sin(angle) + y * Math.cos(angle);
+            x = x + cx;
+            y = y + cy;
+            return new PointF((float)x, (float)y);
+        }
 }
