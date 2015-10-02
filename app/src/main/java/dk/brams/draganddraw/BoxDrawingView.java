@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PointF;
+import android.os.Bundle;
+import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -26,6 +28,7 @@ public class BoxDrawingView extends View {
     // Used when creating the view from XML
     public BoxDrawingView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        setId(R.id.view_id);
 
         // Use a semitransparent red for boxes
         mBoxPaint = new Paint();
@@ -84,5 +87,29 @@ public class BoxDrawingView extends View {
 
             canvas.drawRect(left, top, right, bottom, mBoxPaint);
         }
+    }
+
+    @Override
+    protected Parcelable onSaveInstanceState() {
+        Bundle bundle = new Bundle();
+
+        if (mBoxes.size()!=0) {
+            bundle.putParcelable("instanceState", super.onSaveInstanceState());
+            bundle.putSerializable("arrayListToSave", this.mBoxes);
+        }
+
+        return bundle;
+
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Parcelable state) {
+        Bundle bundle = null;
+        if (state instanceof Bundle) {
+            bundle = (Bundle) state;
+            this.mBoxes = (ArrayList<Box>)bundle.getSerializable("arrayListToSave");
+            state=bundle.getParcelable("instanceState");
+        }
+        super.onRestoreInstanceState(state);
     }
 }

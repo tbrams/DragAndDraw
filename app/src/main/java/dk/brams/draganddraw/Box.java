@@ -3,7 +3,9 @@ package dk.brams.draganddraw;
 
 import android.graphics.PointF;
 
-public class Box {
+import java.io.Serializable;
+
+public class Box implements Serializable {
     private PointF mOrigin;
     private PointF mCurrent;
 
